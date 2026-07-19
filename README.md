@@ -35,7 +35,7 @@ Open `http://127.0.0.1:3087` — try queries like `williwaw`, `bm25`, `tunnel`.
 | `SEARCH_IDP_URL` | (optional) | Identity plane base URL |
 | `SEARCH_DB` / `SEARCH_WAL` | `data/search.db` / `.wal` | Persistence |
 | `SEARCH_SEED` | `true` | Seed ecosystem docs when empty |
-| `SEARCH_INDEX_TOKEN` | empty | Machine token for `POST /api/index` |
+| `SEARCH_INDEX_TOKEN` | empty | Machine token for `POST /api/index` (shared with williwaw/chats/social) |
 
 ## Production
 
@@ -52,5 +52,17 @@ POST /api/index
 Content-Type: application/json
 X-Search-Token: <token>
 
-{"url":"https://example.com","fetch":true}
+{"url":"https://williwaw.app/thread/p_1","title":"…","body":"…","source":"williwaw"}
+
+# Remove a document
+{"url":"https://williwaw.app/thread/p_1","delete":true}
+```
+
+## Product push indexers
+
+When `SEARCH_INDEX_URL` + `SEARCH_INDEX_TOKEN` are set on products:
+
+- **Williwaw** — indexes visible stories on publish/edit/approve; removes on delete/reject; backfills hot feed at boot
+- **Ack / Bandy** — indexes public channel cards; indexes messages that share Williwaw thread URLs
+- **0trust.social** — indexes media metadata (title/kind/mime/originator) on upload; removes on hide
 ```

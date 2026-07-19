@@ -67,22 +67,44 @@ func main() {
 
 	registerRoutes(app)
 
-	handler := product_security.Wrap(cfg.PublicOrigin, otrust.Mount(gk.Mux, ot), "SEARCH_ALLOWED_ORIGINS")
+	// Machine product indexers POST /api/index with X-Search-Token (no browser Origin).
+	var extraOrigins []string
+	for _, env := range []string{"SEARCH_ALLOWED_ORIGINS", "OTRUST_ALLOWED_ORIGINS"} {
+		for _, part := range strings.Split(os.Getenv(env), ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				extraOrigins = append(extraOrigins, part)
+			}
+		}
+	}
+	handler := product_security.Middleware(product_security.Options{
+		PublicOrigin: cfg.PublicOrigin,
+		ExtraOrigins: extraOrigins,
+		ServerToServerPrefixes: []string{
+			"/api/webhooks/",
+			"/api/index",
+		},
+	}, otrust.Mount(gk.Mux, ot))
+	// Public product: homepage, /search results, and GET /api/search stay open.
+	// Only the index console (and session-bearing requests) require DBSC.
+	// POST /api/index enforces its own token/session auth.
 	handler = product_security.DBSCMiddleware(product_security.DBSCOptions{
 		SessionBase:   cfg.AuthURL,
-		LoginBeginURL: strings.TrimRight(cfg.AuthURL, "/") + "/auth/login/begin",
+		LoginBeginURL: strings.TrimRight(cfg.PublicOrigin, "/") + "/auth",
 		ProtectPrefixes: []string{
-			"/api/", "/search", "/admin",
+			"/index",
+			"/admin",
 		},
 		ExemptPrefixes: []string{
-			"/auth", "/guikit.js", "/_0trust/",
+			"/auth", "/guikit.js", "/_0trust/", "/_search/",
+			"/api/search", "/api/health", "/api/index", "/health",
 		},
 		GateAllWithSession: true,
 	}, handler)
 	if gk != nil {
 		gk.SetCheckOrigin(product_security.WSOriginOK(cfg.PublicOrigin, "SEARCH_ALLOWED_ORIGINS"))
 	}
-	log.Printf("[search] listening on %s (%s; DBSC required) · BM25 docs=%d", cfg.ListenAddr, cfg.PublicOrigin, app.Store.DocCount())
+	log.Printf("[search] listening on %s (%s; public search; DBSC on /index) · BM25 docs=%d", cfg.ListenAddr, cfg.PublicOrigin, app.Store.DocCount())
 	orch.Boot(cfg.ListenAddr)
 	server := product_security.SecureServer(cfg.ListenAddr, handler)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -57,8 +57,8 @@ func (app *App) seedCorpus() {
 		{
 			URL:         "https://motionkb.com",
 			Title:       "MotionKB — Docs and sites",
-			Description: "Documentation CMS and public sites on MotionKB and 0Trust.codes.",
-			Body:        "MotionKB is a documentation and site builder. Pages, blocks, public docs search, edge host sync, and PWA support. Editors authenticate with MotionKB IdP; public docs are open on 0trust.codes.",
+			Description: "Documentation CMS and public sites on MotionKB and 0trust.cloud.",
+			Body:        "MotionKB is a documentation and site builder. Pages, blocks, public docs search, edge host sync, and PWA support. Editors authenticate with MotionKB IdP; public docs are open on 0trust.cloud.",
 			Source:      "seed",
 		},
 		{

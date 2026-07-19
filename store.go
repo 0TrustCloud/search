@@ -179,6 +179,29 @@ func (s *Store) IndexDocument(doc Document) error {
 	return nil
 }
 
+// DeleteDocument removes a page from the document store (BM25 postings may linger
+// but Search filters missing docs). Idempotent when the URL was never indexed.
+func (s *Store) DeleteDocument(rawURL string) error {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return fmt.Errorf("url is required")
+	}
+	id := DocIDFromURL(rawURL)
+	if _, ok := s.getDoc(id); !ok {
+		return nil
+	}
+	txn := s.kv.Begin()
+	if err := s.kv.Delete(txn, []byte(docPrefix+id)); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.count > 0 {
+		s.count--
+	}
+	s.mu.Unlock()
+	return nil
+}
+
 // Search runs BM25 over the corpus. Multi-word queries are OR-joined so bag-of-words ranking applies.
 func (s *Store) Search(query string, limit int) (*SearchResponse, error) {
 	start := time.Now()

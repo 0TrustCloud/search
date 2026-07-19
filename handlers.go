@@ -219,6 +219,8 @@ func (app *App) apiIndex(c *guikit.Context) {
 		Description string `json:"description"`
 		Body        string `json:"body"`
 		Fetch       bool   `json:"fetch"`
+		Delete      bool   `json:"delete"`
+		Source      string `json:"source"`
 	}
 	body, _ := io.ReadAll(io.LimitReader(c.R.Body, 1<<20))
 	if len(body) > 0 {
@@ -233,6 +235,8 @@ func (app *App) apiIndex(c *guikit.Context) {
 		in.Description = c.R.FormValue("description")
 		in.Body = c.R.FormValue("body")
 		in.Fetch = c.R.FormValue("fetch") == "1"
+		in.Delete = c.R.FormValue("delete") == "1"
+		in.Source = c.R.FormValue("source")
 	}
 
 	if strings.TrimSpace(in.URL) == "" {
@@ -244,12 +248,31 @@ func (app *App) apiIndex(c *guikit.Context) {
 		rawURL = "https://" + rawURL
 	}
 
+	if in.Delete {
+		if err := app.Store.DeleteDocument(rawURL); err != nil {
+			http.Error(c.W, err.Error(), http.StatusBadRequest)
+			return
+		}
+		c.W.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(c.W).Encode(map[string]interface{}{
+			"ok":     true,
+			"deleted": true,
+			"id":     DocIDFromURL(rawURL),
+			"url":    rawURL,
+		})
+		return
+	}
+
+	src := strings.TrimSpace(in.Source)
+	if src == "" {
+		src = "api"
+	}
 	doc := Document{
 		URL:         rawURL,
 		Title:       in.Title,
 		Description: in.Description,
 		Body:        in.Body,
-		Source:      "api",
+		Source:      src,
 	}
 	if in.Fetch || (doc.Body == "" && doc.Title == "") {
 		if fetched, err := fetchURL(rawURL); err == nil {
@@ -262,7 +285,9 @@ func (app *App) apiIndex(c *guikit.Context) {
 			if doc.Body == "" {
 				doc.Body = fetched.Body
 			}
-			doc.Source = "crawl"
+			if src == "api" {
+				doc.Source = "crawl"
+			}
 		}
 	}
 
